@@ -1,0 +1,30 @@
+#Set up working directory
+└── 2020Spring
+    ├── data
+    │   ├── genome
+    │   └── rawseq
+    ├── results
+    └── src
+        └── slurm-out
+
+#download raw data 
+srun --pty /bin/bash
+module load SRA-Toolkit
+#use one sample to try
+prefetch -v SRR5956519
+cd rawseq
+cp /home/n-z/yihengp2/ncbi/public/sra/SRR5956519.sra .
+fastq-dump --outdir ./ --split-files ./SRR5956519.sra
+
+#quality control
+module load FastQC
+fastqc SRR5956519_1.fastq
+mv SRR5956519_1_fastqc.* ../../results
+
+##alignment
+#download index file for bowtie2
+cd ../genome/
+wget http://igenomes.illumina.com.s3-website-us-east-1.amazonaws.com/Mus_musculus/Ensembl/GRCm38/Mus_musculus_Ensembl_GRCm38.tar.gz
+gunzip *.gz
+module load Bowtie2
+bowtie2  --very-sensitive  -k 10  -x Bowtie2Index/genome  -U ../rawseq/SRR5956519_1.fastq -S ../../results/out1.sam
