@@ -28,3 +28,15 @@ wget http://igenomes.illumina.com.s3-website-us-east-1.amazonaws.com/Mus_musculu
 gunzip *.gz
 module load Bowtie2
 bowtie2  --very-sensitive  -k 10  -x Bowtie2Index/genome  -U ../rawseq/SRR5956519_1.fastq -S ../../results/out1.sam
+
+#sort and transfer to bam
+module load SAMtools
+samtools view -S -b out1.sam > out1.bam
+samtools sort out1.bam -o out1.sorted.bam
+
+
+samtools view -S -b out1.sam > out1.bam
+
+##peak calling
+module load MACS2
+macs2 callpeak -t out1.sorted.bam -n testis -g mm -f BAM --nomodel --shift -100 --extsize 200
