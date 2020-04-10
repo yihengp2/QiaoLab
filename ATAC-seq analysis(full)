@@ -1,0 +1,63 @@
+#Set up working directory
+└── 2020Spring
+    ├── data
+    │   ├── genome
+    │   └── rawseq
+    ├── results
+    └── src
+        └── slurm-out
+#download raw data
+#script
+#----------------------------------------------
+#!/bin/bash
+# ----------------SLURM Parameters----------------
+#SBATCH -p normal
+#SBATCH -n 1
+#SBATCH --mem=16g
+#SBATCH -N 1
+#SBATCH --mail-user=yihengpeng1995@gmail.com
+#SBATCH --mail-type=ALL
+#SBATCH -J download_raw_data
+#SBATCH -D /home/n-z/yihengp2/ATAC-seq/2020Spring/src/slurm-out
+# ----------------Load Modules--------------------
+module load SRA-Toolkit/2.8.2-1
+# ----------------Commands------------------------
+cd /home/n-z/yihengp2/ATAC-seq/2020Spring/data/rawseq
+
+for i in {12..15}
+  do
+prefetch -v SRR59565$i
+
+mv /home/n-z/yihengp2/ncbi/public/sra/SRR59565$i.sra ./
+
+fastq-dump --outdir ./ --split-files SRR59565$i.sra
+
+done
+
+#------------------------------------------------
+##Alignment
+
+#!/bin/bash
+# ----------------SLURM Parameters----------------
+#SBATCH -p normal
+#SBATCH -n 1
+#SBATCH --mem=64g
+#SBATCH -N 1
+#SBATCH --mail-user=yihengpeng1995@gmail.com
+#SBATCH --mail-type=ALL
+#SBATCH -J Alignment
+#SBATCH -D /home/n-z/yihengp2/ATAC-seq/2020Spring/src/slurm-out
+# ----------------Load Modules--------------------
+module load Bowtie2/2.3.5.1-IGB-gcc-4.9.4
+module load SAMtools/1.9-IGB-gcc-4.9.4
+# ----------------Commands------------------------
+cd /home/n-z/yihengp2/ATAC-seq/2020Spring/data/genome
+for i in {12..15}
+  do
+bowtie2  --very-sensitive  -k 10  -x Bowtie2Index/genome  -U ../rawseq/SRR59565${i}_1.fastq -S ../../results/SRR59565${i}.sam
+
+samtools view -S -b ../../results/SRR59565${i}.sam > ../../results/SRR59565${i}.bam
+
+samtools sort ../../results/SRR59565${i}.bam -o ../../results/SRR59565${i}.sorted.bam
+
+done
