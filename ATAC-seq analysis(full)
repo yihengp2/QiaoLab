@@ -60,4 +60,5 @@ samtools view -S -b ../../results/SRR59565${i}.sam > ../../results/SRR59565${i}.
 
 samtools sort ../../results/SRR59565${i}.bam -o ../../results/SRR59565${i}.sorted.bam
 
+
 done
