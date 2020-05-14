@@ -1,0 +1,376 @@
+#!/bin/bash
+# ----------------SLURM Parameters----------------
+#SBATCH -p normal
+#SBATCH -n 4
+#SBATCH --mem=4g
+#SBATCH -N 1
+#SBATCH --mail-user=yihengp2@illinois.edu
+#SBATCH --mail-type=ALL
+#SBATCH -J FeatureCount
+#SBATCH -D /home/n-z/yihengp2/RNA-seq/projects/ju_sp/src/slurmout
+#SBATCH --array 1-24%6
+# ----------------Load Modules--------------------
+module load Subread/1.6.3-IGB-gcc-4.9.4
+# ----------------Commands------------------------
+cd /home/n-z/yihengp2/RNA-seq/projects/ju_sp/src
+
+line=$(sed -n -e "$SLURM_ARRAY_TASK_ID p" namefile.txt)
+
+cd ..
+
+featureCounts -T 5 -a /data/genome/Mus_musculus.GRCm38.99.chr.gtf -t exon -g gene id
+-o /results/subread/${line}_featureCounts.txt /results/star2/${line}.star.countAligned.sortedByCoord.out.bam
+
+[yihengp2@biologin-1 src]$ less qiao-rna-seq-PE_mouse.nf
+[yihengp2@biologin-1 src]$ nano qiao-rna-seq-PE_mouse.nf
+[yihengp2@biologin-1 src]$ cat qiao-rna-seq-PE_mouse.nf
+#!/usr/bin/env nextflow
+/*
+*USAGE: nextflow run rna-seq-SE-customizable.nf -qs 8
+* Note that "-qs" is similar to "#SLURM --array 100%8" and will only run a specified # of jobs at a time.
+* This script creates hard links to data that exists in nextflow's work directory for everything.
+* @author - Jessica Holmes
+*/
+
+/* Set parameter values. - STARTS HERE */
+ // Note that any of the parameters can be set on the command line. For example, params.genome can be set
+ // on the command line by using "--genome".
+
+// Path to project folder
+params.project_path = "/home/n-z/yihengp2/RNA-seq/projects/ju_sp"
+
+// Paths to input files
+params.genome = "$params.project_path/references/STAR-2.5.3a-p6_Index"
+params.gtf = "$params.project_path/data/genome/GCF_000001635.26_GRCm38.p6_genomic.gtf"
+params.rna = "$params.project_path/references/salmon-1.1.0-ncbi-GRCm38.p6"
+params.rawFolder = "$params.project_path/data/raw-seq"
+
+//******* The pattern at the end of this may need to be changed here, and not in config file
+Channel
+    .fromFilePairs("${params.rawFolder}/*.fastq", flat: true)
+    .ifEmpty {error "Cannot find any reads matching: ${params.input_ch}"}
+    .set{ input_ch }
+
+// Skip process
+params.skipTrim = true
+params.skipStar = false
+params.skipSalmon = true
+
+
+// Arranging channels of Seqs based on params.skipTrim
+(trim_ch, quant_ch) = ( params.skipTrim
+                 ? [Channel.empty(), input_ch]
+                 : [input_ch, Channel.empty()] )
+quant_ch.into {star_ch; salmon_ch}
+
+
+
+// Biocluster options. Memory is in GB.
+params.myQueue = 'hpcbio'
+params.trimMemory = '15'
+params.trimCPU = '4'
+params.salmonQueue = 'hpcbio'
+params.starMemory = '40'
+params.starCPU = '8'
+
+params.countMemory = '4'
+params.countCPU = '4'
+params.salmonMem = '24'
+params.salmonCPU = '8'
+
+/*Module versions*/
+params.trimVersion = '0.38' /*Put the version here only*/
+params.trimMod = 'Trimmomatic/0.38-Java-1.8.0_152'
+params.fastqcMod = 'FastQC/0.11.8-IGB-gcc-4.9.4-Java-1.8.0_152'
+params.starMod = 'STAR/2.7.3a-IGB-gcc-8.2.0'
+params.featCountMod = 'Subread/1.6.3-IGB-gcc-4.9.4'
+params.salmonMod = 'Salmon/1.1.0-IGB-gcc-8.2.0'
+params.multiqcMod = 'MultiQC/1.6-IGB-gcc-4.9.4-Python-3.6.1'
+params.RMod = 'R/3.6.0-IGB-gcc-8.2.0'
+
+
+// Trimming options
+params.trimOptions = 'ILLUMINACLIP:$EBROOTTRIMMOMATIC/adapters/TruSeq3-PE-2.fa:2:15:10 LEADING:28 TRAILING:28 MINLEN:30'
+
+
+
+// Alignment & counting options
+params.overhang = '149'  /* This is the value listed in STAR's sjdbOverhang parameter */
+params.countMetaFeat = 'gene_id' /* meta-feature used to group features by. Usually "gene_id" */
+params.countFeature = 'exon' /* Feature in annotation that is considered for counting. Usually "exon" */
+params.boots = '30' // Number of bootstraps for Salmon
+params.strand = '2' /* Strandedness of reads: 0 = unstranded, 1 = forward stranded, 2 = reverse stranded */
+
+
+// Output paths
+params.outPathRoot = "$params.project_path/results"
+
+params.trimPath = "$params.outPathRoot/trimmomatic/"
+params.alignPath = "$params.outPathRoot/alignments/"
+params.salmonPath = "$params.outPathRoot/salmon/"
+params.countPath = "$params.outPathRoot/counts/"
+params.fastqcPath = "$params.outPathRoot/fastqc_afterTrim/"
+params.multiqcPath = "$params.outPathRoot/"
+
+/* Set parameter values - ENDS HERE */
+
+
+/* Code that should not change - STARTS HERE */
+
+// Reference files
+if(params.skipStar == false){
+gtf_file = file(params.gtf)
+genome_file = file(params.genome)
+}
+
+if(params.skipSalmon == false){
+rna_file = file(params.rna)
+}
+
+
+process trimmomatic {
+    executor 'slurm'
+    cpus params.trimCPU
+    queue params.myQueue
+    memory "${params.trimMemory} GB"
+    module params.trimMod
+    publishDir params.trimPath, mode: 'link'
+    validExitStatus 0,1
+    scratch              '/scratch'
+    stageOutMode         'copy'
+
+    input:
+    set val(id), file(read1), file(read2) from trim_ch
+
+    output:
+    set val(id), "${read1.baseName}.qualtrim.paired.fastq", "${read2.baseName}.qualtrim.paired.fastq" into trim_channel1
+    set val(id), "${read1.baseName}.qualtrim.paired.fastq", "${read2.baseName}.qualtrim.paired.fastq" into trim_channel2
+    set val(id), "${read1.baseName}.qualtrim.paired.fastq", "${read2.baseName}.qualtrim.paired.fastq" into trim_channel3
+
+
+    """
+    java -jar  \$EBROOTTRIMMOMATIC/trimmomatic-${params.trimVersion}.jar PE \
+    -threads ${params.trimCPU} -phred33 ${read1} ${read2} \
+    ${read1.baseName}.qualtrim.paired.fastq ${read1.baseName}.qualtrim.unpaired.fastq \
+    ${read2.baseName}.qualtrim.paired.fastq ${read2.baseName}.qualtrim.unpaired.fastq \
+    $params.trimOptions
+    """
+}
+(raw_fastqc) = ( params.skipStar
+             ? [Channel.empty()]
+             : [trim_channel1])
+
+/*
+* Step 2. FASTQC on trimmed files
+*/
+process runFASTQC {
+    executor 'slurm'
+    cpus 1
+    queue params.myQueue
+    memory '2 GB'
+    module params.fastqcMod
+    publishDir params.fastqcPath, mode: 'link'
+
+
+    input:
+    set pair_id, file(read1), file(read2) from raw_fastqc
+
+    output:
+    file "*" into trim_files
+
+    """
+    fastqc --noextract ${read1}
+    fastqc --noextract ${read2}
+
+    """
+}
+
+process runMultiQCtrim{
+    executor 'slurm'
+    cpus 1
+    queue params.myQueue
+    memory "4 GB"
+    module params.multiqcMod
+    publishDir params.fastqcPath, mode: 'link'
+
+    input:
+        file('*') from trim_files.collect()
+
+    output:
+        file "multiqc_report_trimfastqc.html"
+        file "multiqc*data/*"
+        file 'FASTQC-reports-trim.zip'
+
+    """
+    multiqc -n multiqc_report_trimfastqc.html *
+    zip FASTQC-reports-trim.zip *.html
+    """
+}
+
+if(params.skipStar == false){
+
+/*
+* Step 3. STAR alignment
+*/
+
+limitM = params.starMemory + '000000000'
+
+process runSTAR {
+    executor 'slurm'
+    cpus params.starCPU
+    queue params.myQueue
+    memory "$params.starMemory GB"
+    module params.starMod
+    errorStrategy        'finish'
+    scratch              '/scratch'
+    stageOutMode         'copy'
+    publishDir params.alignPath, mode: 'link'
+
+    input:
+    file genome_file
+    set pair_id, file(read1), file(read2) from star_ch.mix(trim_channel2)
+
+    output:
+    file "${pair_id}_Aligned.sortedByCoord.out.bam" into align_channel
+    file "${pair_id}_Log*.out"
+    file "${pair_id}_*.out.tab"
+    file "${pair_id}__STARgenome/*.t*"
+    file "${pair_id}_*" into star_files
+
+    script:
+
+     if(params.skipTrim == false)
+
+     """
+      STAR --runThreadN $params.starCPU \
+      --genomeDir ${genome_file} \
+      --readFilesIn ${in_trim} \
+      --sjdbGTFfile ${read1} ${read2} \
+      --outFileNamePrefix ${pair_id}_ \
+      --sjdbGTFtagExonParentGene $params.countMetaFeat \
+      --outSAMtype BAM SortedByCoordinate \
+      --quantMode GeneCounts \
+      --limitGenomeGenerateRAM $limitM
+     """
+     else
+     """
+      STAR --runThreadN $params.starCPU \
+      --genomeDir ${genome_file} \
+      --readFilesIn ${read1} ${read2} \
+      --sjdbGTFfile ${gtf_file} \
+      --readFilesCommand gunzip -c \
+      --outFileNamePrefix ${pair_id}_ \
+      --sjdbGTFtagExonParentGene $params.countMetaFeat \
+      --outSAMtype BAM SortedByCoordinate \
+      --quantMode GeneCounts \
+      --limitGenomeGenerateRAM $limitM
+    """
+}
+
+
+
+/*
+* Step 4. Count data with FeatureCounts. Execute only when STAR is enabled.
+*/
+
+
+process featureCount {
+    executor 'slurm'
+    cpus params.countCPU
+    queue params.myQueue
+    memory "$params.countMemory GB"
+    module "$params.featCountMod"
+    publishDir params.countPath, mode: 'link'
+    validExitStatus 0,1
+
+    input:
+    file in_count from align_channel
+
+    output:
+    file "*_featCounts.txt*"
+    file "*" into count_files
+
+    """
+    featureCounts -T $params.countCPU -s $params.strand -C -p -g \
+    $params.countMetaFeat -t $params.countFeature \
+    -o ${in_count.baseName}_featCounts.txt -a ${gtf_file} ${in_count}
+    """
+}
+
+
+process runMultiQCcounts{
+    executor 'slurm'
+    cpus 1
+    queue params.myQueue
+    memory "4 GB"
+    module params.multiqcMod
+    publishDir params.multiqcPath, mode: 'link'
+
+    input:
+        file('*') from count_files.collect()
+        file('*') from star_files.collect()
+
+    output:
+        file "multiqc_report_align-counts.html"
+        file "multiqc*data/*"
+
+    """
+    multiqc -n multiqc_report_align-counts.html .
+    """
+}
+
+}
+
+/*
+* Step 5. Salmon quasi alignment
+*/
+
+if(params.skipSalmon==false){
+
+process runSalmon {
+    executor 'slurm'
+    cpus params.salmonCPU
+    queue params.salmonQueue
+    memory "$params.salmonMem GB"
+    module "$params.salmonMod"
+    errorStrategy        'finish'
+    scratch              '/scratch'
+    stageOutMode         'copy'
+    publishDir params.salmonPath, mode: 'link'
+
+    input:
+    file rna_file
+    set val(id), file(read1), file(read2) from salmon_ch.mix(trim_channel3)
+
+    output:
+    file "${id}"
+    file "${id}" into salmon_files
+
+    """
+     salmon quant -i ${rna_file} -l A \
+    -1 $read1 -2 $read2 --numBootstraps=${params.boots} \
+    --validateMappings --recoverOrphans \
+    -o ${id} --seqBias --gcBias --writeUnmappedNames -p $params.salmonCPU
+    """
+}
+
+process salmonSummarize{
+    executor 'slurm'
+    cpus 1
+    queue params.myQueue
+    memory "8 GB"
+    module "$params.RMod"
+    publishDir params.salmonPath, mode: 'link'
+
+    input:
+        file('*') from salmon_files.collect()
+
+    output:
+        file "*"
+
+    """
+    Rscript /home/groups/hpcbio/RNA-Seq/templates/dir_structure/src/Salmon_summarizeOutput.R
+    """
+
+}
+}
