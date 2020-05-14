@@ -62,3 +62,10 @@ samtools sort ../../results/SRR59565${i}.bam -o ../../results/SRR59565${i}.sorte
 
 
 done
+
+####data transfer#######
+##open a local session###
+cd Desktop/
+mkdir ATAC_Seq
+cd ATAC_Seq/
+scp yihengp2@biologin.igb.illinois.edu:/home/n-z/yihengp2/ATAC-seq/2020Spring/results/*.sorted.bam.tdf .
