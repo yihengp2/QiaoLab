@@ -28,6 +28,28 @@ STAR --runThreadN $SLURM_NTASKS \
      --outSAMtype BAM SortedByCoordinate
      
 ####Feature Count########
+#!/bin/bash
+# ----------------SLURM Parameters----------------
+#SBATCH -p normal
+#SBATCH -n 4
+#SBATCH --mem=4g
+#SBATCH -N 1
+#SBATCH --mail-user=yihengp2@illinois.edu
+#SBATCH --mail-type=ALL
+#SBATCH -J FeatureCount
+#SBATCH -D /home/n-z/yihengp2/RNA-seq/projects/ju_sp/src/slurmout
+#SBATCH --array 1-24%6
+# ----------------Load Modules--------------------
+module load Subread/1.6.3-IGB-gcc-4.9.4
+# ----------------Commands------------------------
+cd /home/n-z/yihengp2/RNA-seq/projects/ju_sp/src
+
+line=$(sed -n -e "$SLURM_ARRAY_TASK_ID p" namefile.txt)
+
+cd ..
+
+featureCounts -T 5 -a /data/genome/Mus_musculus.GRCm38.99.chr.gtf -t exon -g gene id
+-o /results/subread/${line}_featureCounts.txt /results/star2/${line}.star.countAligned.sortedByCoord.out.bam
 
 
 #######Salmon Alignment#######
