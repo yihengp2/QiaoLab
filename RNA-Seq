@@ -1,0 +1,35 @@
+#####STAR Aligment########
+#!/bin/bash
+# ----------------SLURM Parameters----------------
+#SBATCH -p normal
+#SBATCH -n 4
+#SBATCH --mem=40g
+#SBATCH -N 1
+#SBATCH --mail-user=yihengp2@illinois.edu
+#SBATCH --mail-type=ALL
+#SBATCH -J STAR-Alignment
+#SBATCH -D /home/n-z/yihengp2/RNA-seq/projects/ju_sp/results/star2/slurmout
+#SBATCH --array 1-24%6
+# ----------------Load Modules--------------------
+module load STAR/2.5.3a-IGB-gcc-4.9.4
+# ----------------Commands------------------------
+cd /home/n-z/yihengp2/RNA-seq/projects/ju_sp/src
+
+line=$(sed -n -e "$SLURM_ARRAY_TASK_ID p" namefile.txt)
+
+STAR --runThreadN $SLURM_NTASKS \
+     --genomeDir ../data/genome/STAR-2.5.3a-99_Index \
+     --quantMode GeneCounts \
+     --outTmpDir /scratch/$SLURM_JOB_ID \
+     --readFilesIn  ../data/raw-seq/${line}.fastq  \
+     --sjdbGTFfile ../data/genome/Mus_musculus.GRCm38.99.chr.gtf \
+     --outFileNamePrefix ../results/star2/${line}.star.count \
+     --limitGenomeGenerateRAM 39000000000 \
+     --outSAMtype BAM SortedByCoordinate
+     
+####Feature Count########
+
+
+#######Salmon Alignment#######
+
+
