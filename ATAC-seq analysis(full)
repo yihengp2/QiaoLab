@@ -62,6 +62,26 @@ samtools sort ../../results/SRR59565${i}.bam -o ../../results/SRR59565${i}.sorte
 
 
 done
+###igv count####
+#!/bin/bash
+#SBATCH -p normal
+#SBATCH -n 4
+#SBATCH --mem=16g
+#SBATCH -N 1
+#SBATCH --mail-user=yihengp2@illinois.edu
+#SBATCH --mail-type=ALL
+#SBATCH -J FeatureCount
+#SBATCH -D /home/n-z/yihengp2/ATAC-seq/2020Spring/src/slurm-out
+# ----------------Load Modules--------------------
+module load igv/2.8.0-Java-11.0.5
+
+# ----------------Commands------------------------
+cd /home/n-z/yihengp2/ATAC-seq/2020Spring/results
+for i in {12..15}
+  do
+igvtools count SRR59565${i}.sorted.bam SRR59565${i}.sorted.bam.tdf mm10
+done
+
 
 ####data transfer#######
 ##open a local session###
