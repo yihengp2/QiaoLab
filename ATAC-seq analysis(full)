@@ -83,6 +83,28 @@ igvtools count SRR59565${i}.sorted.bam SRR59565${i}.sorted.bam.tdf mm10
 done
 
 
+####Peakcalling####
+#!/bin/bash
+# ----------------SLURM Parameters----------------
+#SBATCH -p normal
+#SBATCH -n 4
+#SBATCH --mem=16g
+#SBATCH -N 1
+#SBATCH --mail-user=yihengp2@illinois.edu
+#SBATCH --mail-type=ALL
+#SBATCH -J Peakcalling
+#SBATCH -D /home/n-z/yihengp2/ATAC-seq/2020Spring/src/slurm-out
+# ----------------Load Modules--------------------
+module load MACS2/2.1.1.20160309-IGB-gcc-4.9.4-Python-2.7.13
+# ----------------Commands------------------------
+cd /home/n-z/yihengp2/ATAC-seq/2020Spring/results/
+for i in {12..15}
+  do
+macs2 callpeak -t SRR59565${i}.sorted.bam -n testis -g mm -f BAM --nomodel --shift -100 --extsize 200
+done
+
+
+
 ####data transfer#######
 ##open a local session###
 cd Desktop/
