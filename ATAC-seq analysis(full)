@@ -100,7 +100,7 @@ module load MACS2/2.1.1.20160309-IGB-gcc-4.9.4-Python-2.7.13
 cd /home/n-z/yihengp2/ATAC-seq/2020Spring/results/
 for i in {12..15}
   do
-macs2 callpeak -t SRR59565${i}.sorted.bam -n testis -g mm -f BAM --nomodel --shift -100 --extsize 200
+macs2 callpeak -t SRR59565${i}.sorted.bam -n testis${i} -g mm -f BAM --nomodel --shift -100 --extsize 200
 done
 
 
