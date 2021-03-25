@@ -4,3 +4,9 @@
 ##BL-CAP-C F123 G3 rep1 SRR12053668 BL-CAP-C F123 G3 rep2 SRR12053669
 ##BL-CAP-C F123 G5 rep1 SRR12053670 BL-CAP-C F123 G5 rep1 SRR12053671
 ##BL-CAP-C F123 G7 rep1 SRR12053672 BL-CAP-C F123 G7 rep1 SRR12053673
+
+jobs: 10
+cluster: "sbatch -p high -t {resources.time_min} --mem={resources.mem_mb} -c {resources.cpus} -o logs_slurm/{rule}_{wildcards} -e logs_slurm/{rule}_{wildcards} --mail-type=FAIL --mail-user=yihengp2@illinois.edu"
+default-resources: [cpus=1, mem_mb=50000, time_min=60]
+resources: [cpus=30, mem_mb=500000]
+use-conda: true
