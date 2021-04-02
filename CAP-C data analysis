@@ -10,3 +10,5 @@ cluster: "sbatch -p high -t {resources.time_min} --mem={resources.mem_mb} -c {re
 default-resources: [cpus=1, mem_mb=50000, time_min=60]
 resources: [cpus=30, mem_mb=500000]
 use-conda: true
+
+snakemake -j 2 -n --cluster-config /home/n-z/yihengp2/.config/snakemake/cluster_config.yaml --latency-wait 120 targets_split
